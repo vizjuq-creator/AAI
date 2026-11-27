@@ -13,11 +13,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii } from '../theme';
 
-export type ScreenName = 'analyze' | 'compare' | 'notebook' | 'method';
+export type ScreenName = 'analyze' | 'compare' | 'trainer' | 'notebook' | 'method';
 
 const NAV_ITEMS: Array<{ key: ScreenName; href: string; label: string; glyph: string }> = [
   { key: 'analyze', href: '/', label: 'الرصد', glyph: '◉' },
   { key: 'compare', href: '/compare', label: 'المقارنة', glyph: '⇄' },
+  { key: 'trainer', href: '/trainer', label: 'التدريب', glyph: '△' },
   { key: 'notebook', href: '/notebook', label: 'الدفتر', glyph: '▤' },
   { key: 'method', href: '/method', label: 'المنهج', glyph: '⌘' },
 ];
@@ -270,12 +271,12 @@ const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 16 },
   footerNote: { width: '100%', maxWidth: 1000, alignSelf: 'center', color: '#87928B', fontSize: 10, textAlign: 'center', paddingTop: 18, paddingBottom: 3 },
   bottomBar: { backgroundColor: colors.surface, borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 9, paddingBottom: 5 },
-  bottomBarInner: { flexDirection: 'row', width: '100%', maxWidth: 480, alignSelf: 'center', justifyContent: 'space-around', gap: 4 },
-  navItem: { minWidth: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 7, borderRadius: 15, gap: 1 },
+  bottomBarInner: { flexDirection: 'row', width: '100%', maxWidth: 520, alignSelf: 'center', justifyContent: 'space-around', gap: 2 },
+  navItem: { minWidth: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 7, borderRadius: 13, gap: 1 },
   navItemSelected: { backgroundColor: colors.mintSoft },
-  navGlyph: { color: '#78857E', fontSize: 19, lineHeight: 22, fontWeight: '700' },
+  navGlyph: { color: '#78857E', fontSize: 17, lineHeight: 20, fontWeight: '700' },
   navGlyphSelected: { color: colors.forest },
-  navLabel: { color: '#78857E', fontSize: 10, fontWeight: '600' },
+  navLabel: { color: '#78857E', fontSize: 9, fontWeight: '600' },
   navLabelSelected: { color: colors.forest, fontWeight: '800' },
   eyebrow: { color: colors.teal, fontSize: 10, fontWeight: '800', letterSpacing: 1.3, textAlign: 'right', textTransform: 'uppercase' },
   eyebrowLight: { color: '#C4DAA2' },

@@ -158,7 +158,7 @@ function SavedMetric({ label, value }: { label: string; value: number }) {
 }
 
 export default function NotebookScreen() {
-  const { sources, experiments, ready, storageError, addSource, deleteSource, deleteExperiment } = useResearchNotebook();
+  const { sources, experiments, trainingExamples, modelTrainedAt, ready, storageError, addSource, deleteSource, deleteExperiment } = useResearchNotebook();
   const [activeTab, setActiveTab] = useState<NotebookTab>('sources');
   const [author, setAuthor] = useState('');
   const [book, setBook] = useState('');
@@ -176,7 +176,9 @@ export default function NotebookScreen() {
     exportedAt: new Date().toISOString(),
     sources,
     experiments,
-  }, null, 2), [sources, experiments]);
+    trainingExamples,
+    modelTrainedAt,
+  }, null, 2), [sources, experiments, trainingExamples, modelTrainedAt]);
 
   const saveSource = () => {
     if (!ready) return;
@@ -242,6 +244,7 @@ export default function NotebookScreen() {
       <View style={styles.metricsRow}>
         <MetricCard label="مصادر موثّقة" value={formatArabicNumber(sources.length)} note="نصوص من كتب" accent={colors.teal} />
         <MetricCard label="تجارب مقارنة" value={formatArabicNumber(experiments.length)} note="من شاشة المقارنة" accent={colors.gold} />
+        <MetricCard label="أمثلة تدريب" value={formatArabicNumber(trainingExamples.length)} note={modelTrainedAt ? 'نموذج مدرّب' : 'بيانات محلية'} accent={colors.violet} />
       </View>
 
       {storageError ? (

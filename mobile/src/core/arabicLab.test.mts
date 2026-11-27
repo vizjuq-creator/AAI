@@ -5,10 +5,15 @@ import {
   analyzeText,
   compareHdcRecords,
   comparePoincareForms,
+  encodeFeatureSequence,
+  evaluateHdcClassifier,
   getFeatureBits,
   lookupMorphology,
   normalizeArabic,
   poincareDistance,
+  predictHdcClassifier,
+  similarityPercent,
+  trainHdcClassifier,
 } from './arabicLab.ts';
 
 test('normalization removes tashkeel and folds selected alef variants', () => {
@@ -56,6 +61,43 @@ test('HDC uses a 1024-bit deterministic representation and identical roots match
   assert.equal(comparison.rootSimilarity, 100);
   assert.equal(comparison.boundBits.length, 64);
   assert.ok(comparison.patternSimilarity >= 0 && comparison.patternSimilarity <= 100);
+});
+
+test('HDC distinguishes written Arabic vowel marks while leaving unmarked forms unknown', () => {
+  const kataba = encodeFeatureSequence('كَتَبَ');
+  const kutub = encodeFeatureSequence('كُتُب');
+  const unmarked = encodeFeatureSequence('كتب');
+
+  assert.equal(normalizeArabic('كَتَبَ'), normalizeArabic('كُتُب'));
+  assert.equal(similarityPercent(kataba, encodeFeatureSequence('كَتَبَ')), 100);
+  assert.ok(similarityPercent(kataba, kutub) < 100);
+  assert.ok(similarityPercent(kataba, unmarked) < 100);
+
+  const patternClassifier = trainHdcClassifier([
+    { text: 'كَتَبَ', label: 'فَعَلَ' },
+    { text: 'كُتُب', label: 'فُعُل' },
+  ]);
+  assert.equal(predictHdcClassifier(patternClassifier, 'كَتَبَ')?.label, 'فَعَلَ');
+  assert.equal(predictHdcClassifier(patternClassifier, 'كُتُب')?.label, 'فُعُل');
+});
+
+test('HDC prototype classifier trains from labels and predicts on the same device', () => {
+  const training = [
+    { text: 'كَتَبَ', label: 'كتب' },
+    { text: 'كَتَبَ', label: 'كتب' },
+    { text: 'نَهْر', label: 'نهر' },
+  ];
+  const classifier = trainHdcClassifier(training);
+  const prediction = predictHdcClassifier(classifier, 'كَتَبَ');
+  const evaluation = evaluateHdcClassifier(classifier, training);
+
+  assert.equal(classifier.dimension, 1024);
+  assert.equal(classifier.exampleCount, 3);
+  assert.equal(classifier.prototypes.length, 2);
+  assert.equal(prediction?.label, 'كتب');
+  assert.equal(prediction?.similarity, 100);
+  assert.equal(evaluation.total, 3);
+  assert.equal(evaluation.accuracyPercent, 100);
 });
 
 test('Poincare distance is finite, symmetric, and zero for an identical point', () => {

@@ -4,10 +4,11 @@ An Android-first, offline research workbench for testing parts of the proposed A
 
 ## What is implemented
 
-- Arabic-first RTL interface with four work areas: **رصد** (analyze), **مقارنة** (compare), **الدفتر** (source and experiment notebook), and **المنهج** (research notes).
+- Arabic-first RTL interface with five work areas: **رصد** (analyze), **مقارنة** (compare), **التدريب** (on-device model lab), **الدفتر** (source and experiment notebook), and **المنهج** (research notes).
 - Local Arabic normalization with the original input kept visible, a small hand-authored articulatory feature table, and a tiny example lexicon for forms of **كتب** plus a couple of comparison roots.
 - Ambiguity is surfaced: unvowelled `كتب` returns more than one example analysis instead of pretending the spelling uniquely identifies a pattern.
 - Deterministic 1-bit HDC demonstration: compare bundled examples or enter a custom form/root/pattern; inspect 1,024-bit feature-sequence/root and pattern vectors, XOR binding, Hamming similarity, a 64-bit window, and a shareable JSON report.
+- A genuinely trainable on-device HDC prototype classifier: label Arabic forms with roots/patterns, assign train/test splits, train from consonant-feature sequences and written tashkeel when present, and run local closed-set predictions with held-out accuracy. Unmarked spelling is not treated as sukun. It is a small discriminative baseline, not a generative LLM.
 - Poincaré distance calculation over **synthetic, untrained illustrative points**.
 - A persistent, offline research notebook for source quotations, edition/page provenance, researcher interpretation, and computational hypotheses; comparisons can be saved and linked to a source. Records can be exported as JSON.
 - An in-app research review that distinguishes heritage source claims, the researcher’s interpretation, and experimental results.

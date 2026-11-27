@@ -49,6 +49,8 @@ export type MorphSample = {
 };
 
 const DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+const DIACRITIC_CHARACTER = /^[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]$/u;
+const ARABIC_LETTER_CHARACTER = /^[\u0621-\u064A\u0671\u06CC]$/u;
 const TATWEEL = /\u0640/g;
 const LOOKUP_FOLDS: Array<[RegExp, string]> = [
   [/[أإآٱ]/g, 'ا'],
@@ -67,6 +69,18 @@ const FEATURE_GROUPS = [
   'ءبتدطكقج',
   'من',
 ];
+
+const DIACRITIC_FEATURES = [
+  { label: 'fatha', mark: '\u064e' },
+  { label: 'damma', mark: '\u064f' },
+  { label: 'kasra', mark: '\u0650' },
+  { label: 'sukun', mark: '\u0652' },
+  { label: 'shadda', mark: '\u0651' },
+  { label: 'tanwin-fath', mark: '\u064b' },
+  { label: 'tanwin-damm', mark: '\u064c' },
+  { label: 'tanwin-kasr', mark: '\u064d' },
+  { label: 'dagger-alif', mark: '\u0670' },
+] as const;
 
 function canonicalPhoneticLetter(letter: string): string {
   if ('أإآٱؤئ'.includes(letter)) return 'ء';
@@ -101,7 +115,19 @@ export function getFeatureBits(letter: string): FeatureBits {
 }
 
 function letterCharacters(text: string): string[] {
-  return Array.from(stripDiacritics(text)).filter((character) => /[\u0621-\u064A\u0671\u06CC]/u.test(character));
+  return Array.from(stripDiacritics(text)).filter((character) => ARABIC_LETTER_CHARACTER.test(character));
+}
+
+function letterSegments(text: string): Array<{ letter: string; marks: string[] }> {
+  const segments: Array<{ letter: string; marks: string[] }> = [];
+  for (const character of Array.from(text)) {
+    if (ARABIC_LETTER_CHARACTER.test(character)) {
+      segments.push({ letter: character, marks: [] });
+    } else if (DIACRITIC_CHARACTER.test(character) && segments.length > 0) {
+      segments[segments.length - 1]?.marks.push(character);
+    }
+  }
+  return segments;
 }
 
 function tokenize(text: string): string[] {
@@ -250,12 +276,29 @@ function featureHypervector(bits: FeatureBits): Uint8Array {
   return majorityBundle(terms, `feature-bundle:${bits.map((bit) => (bit ? 1 : 0)).join('')}`);
 }
 
+function diacriticHypervector(marks: string[]): Uint8Array {
+  const markSet = new Set(marks);
+  const knownMarks = new Set<string>(DIACRITIC_FEATURES.map((feature) => feature.mark));
+  const states = [
+    ...DIACRITIC_FEATURES.map((feature) => ({ label: feature.label, present: markSet.has(feature.mark) })),
+    { label: 'other-mark', present: marks.some((mark) => !knownMarks.has(mark)) },
+    { label: 'mark-present', present: marks.length > 0 },
+  ];
+  const terms = states.map(({ label, present }) => {
+    const role = randomHypervector(`diacritic-role:${label}`);
+    const value = randomHypervector(`diacritic-value:${label}:${present ? 1 : 0}`);
+    return xor(role, value);
+  });
+  return majorityBundle(terms, `diacritics:${Array.from(markSet).sort().join('')}`);
+}
+
 export function encodeFeatureSequence(text: string): Uint8Array {
-  const letters = letterCharacters(text);
-  if (letters.length === 0) return randomHypervector('empty-arabic-sequence');
-  const terms = letters.map((letter, index) => {
-    const featureVector = featureHypervector(getFeatureBits(letter));
-    return rotate(featureVector, (index * 131) % HDC_DIMENSION);
+  const segments = letterSegments(text);
+  if (segments.length === 0) return randomHypervector('empty-arabic-sequence');
+  const terms = segments.map(({ letter, marks }, index) => {
+    const consonantVector = featureHypervector(getFeatureBits(letter));
+    const harakaVector = diacriticHypervector(marks);
+    return rotate(xor(consonantVector, harakaVector), (index * 131) % HDC_DIMENSION);
   });
   return majorityBundle(terms, `sequence:${normalizeArabic(text)}`);
 }
@@ -285,6 +328,71 @@ export function hammingDistance(left: Uint8Array, right: Uint8Array): number {
 export function similarityPercent(left: Uint8Array, right: Uint8Array): number {
   const length = Math.max(left.length, right.length, 1);
   return Math.round(((length - hammingDistance(left, right)) / length) * 100);
+}
+
+export type HdcTrainingPair = { text: string; label: string };
+export type HdcPrototype = { label: string; support: number; bits: number[] };
+export type HdcClassifier = { dimension: number; exampleCount: number; prototypes: HdcPrototype[] };
+export type HdcPrediction = { label: string; similarity: number; runnerUp?: { label: string; similarity: number }; margin: number };
+export type HdcEvaluation = { total: number; correct: number; accuracyPercent: number | null; meanSimilarity: number | null };
+
+/** Train a simple supervised HDC nearest-prototype classifier from labeled examples. */
+export function trainHdcClassifier(examples: HdcTrainingPair[]): HdcClassifier {
+  const byLabel = new Map<string, Uint8Array[]>();
+  let exampleCount = 0;
+  for (const example of examples) {
+    const label = example.label.trim();
+    if (!label || !letterCharacters(example.text).length) continue;
+    const vectors = byLabel.get(label) ?? [];
+    vectors.push(encodeFeatureSequence(example.text));
+    byLabel.set(label, vectors);
+    exampleCount += 1;
+  }
+
+  const prototypes = Array.from(byLabel.entries()).map(([label, vectors]) => {
+    const prototype = majorityBundle(vectors, `trained-class:${label}`);
+    return { label, support: vectors.length, bits: Array.from(prototype) };
+  });
+
+  return { dimension: HDC_DIMENSION, exampleCount, prototypes };
+}
+
+export function predictHdcClassifier(classifier: HdcClassifier, text: string): HdcPrediction | null {
+  if (classifier.prototypes.length === 0 || letterCharacters(text).length === 0) return null;
+  const query = encodeFeatureSequence(text);
+  const ranked = classifier.prototypes
+    .map((prototype) => ({
+      label: prototype.label,
+      similarity: similarityPercent(query, Uint8Array.from(prototype.bits)),
+    }))
+    .sort((left, right) => right.similarity - left.similarity || left.label.localeCompare(right.label));
+  const best = ranked[0];
+  if (!best) return null;
+  const runnerUp = ranked[1];
+  return {
+    ...best,
+    ...(runnerUp ? { runnerUp } : {}),
+    margin: runnerUp ? best.similarity - runnerUp.similarity : best.similarity,
+  };
+}
+
+export function evaluateHdcClassifier(classifier: HdcClassifier, examples: HdcTrainingPair[]): HdcEvaluation {
+  let correct = 0;
+  let similarityTotal = 0;
+  let total = 0;
+  for (const example of examples) {
+    const prediction = predictHdcClassifier(classifier, example.text);
+    if (!prediction) continue;
+    total += 1;
+    if (prediction.label === example.label.trim()) correct += 1;
+    similarityTotal += prediction.similarity;
+  }
+  return {
+    total,
+    correct,
+    accuracyPercent: total ? Math.round((correct / total) * 100) : null,
+    meanSimilarity: total ? Math.round(similarityTotal / total) : null,
+  };
 }
 
 export function compareHdcRecords(left: HdcRecord, right: HdcRecord): HdcComparison {
