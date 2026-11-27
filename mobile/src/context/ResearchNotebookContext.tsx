@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type {
+  GeneratedMeaningCandidate,
+  LetterMeaningHypothesis,
+  LetterMeaningScope,
+} from '../core/heritageGenerator';
 
 export type SourceCategory = 'phonetics' | 'letter-semantics' | 'morphology' | 'other';
 export type TrainingSplit = 'train' | 'test';
@@ -47,16 +52,41 @@ export type MorphologyTrainingExample = {
   createdAt: string;
 };
 
+export type HeritageModelTraining = {
+  sourceId: string;
+  scope: LetterMeaningScope;
+  signature: string;
+  hypothesisIds: string[];
+  trainedAt: string;
+};
+
+export type SavedHeritageGeneration = {
+  id: string;
+  source: Pick<HeritageSource, 'id' | 'author' | 'book' | 'edition' | 'location' | 'excerpt'>;
+  scope: LetterMeaningScope;
+  input: string;
+  letters: string[];
+  modelSignature: string;
+  hypothesisSnapshot: Array<Pick<LetterMeaningHypothesis, 'id' | 'letter' | 'position' | 'researcherInterpretation' | 'semanticMotifs'>>;
+  candidates: GeneratedMeaningCandidate[];
+  createdAt: string;
+};
+
 type StoredNotebook = {
   sources: HeritageSource[];
   experiments: ComparisonExperiment[];
   trainingExamples: MorphologyTrainingExample[];
   modelTrainedAt: string | null;
+  letterHypotheses: LetterMeaningHypothesis[];
+  heritageGenerations: SavedHeritageGeneration[];
+  heritageModelTraining: HeritageModelTraining | null;
 };
 
 type NewHeritageSource = Omit<HeritageSource, 'id' | 'createdAt'>;
 type NewComparisonExperiment = Omit<ComparisonExperiment, 'id' | 'createdAt'>;
 type NewTrainingExample = Omit<MorphologyTrainingExample, 'id' | 'createdAt'>;
+type NewLetterHypothesis = Omit<LetterMeaningHypothesis, 'id' | 'createdAt'>;
+type NewHeritageGeneration = Omit<SavedHeritageGeneration, 'id' | 'createdAt'>;
 
 type NotebookContextValue = StoredNotebook & {
   ready: boolean;
@@ -68,7 +98,13 @@ type NotebookContextValue = StoredNotebook & {
   deleteExperiment: (id: string) => void;
   deleteTrainingExample: (id: string) => void;
   updateTrainingExampleSplit: (id: string, split: TrainingSplit) => void;
+  addLetterHypothesis: (hypothesis: NewLetterHypothesis) => void;
+  deleteLetterHypothesis: (id: string) => void;
+  setLetterHypothesisModelReady: (id: string, modelReady: boolean) => void;
+  addHeritageGeneration: (generation: NewHeritageGeneration) => void;
+  deleteHeritageGeneration: (id: string) => void;
   markModelTrained: (trainedAt: string) => void;
+  markHeritageModelTrained: (training: HeritageModelTraining) => void;
 };
 
 const STORAGE_KEY = '@miyaar/research-notebook/v1';
@@ -87,6 +123,11 @@ function normalizeStoredNotebook(value: unknown): StoredNotebook | null {
     experiments: candidate.experiments,
     trainingExamples: Array.isArray(candidate.trainingExamples) ? candidate.trainingExamples : [],
     modelTrainedAt: typeof candidate.modelTrainedAt === 'string' ? candidate.modelTrainedAt : null,
+    letterHypotheses: Array.isArray(candidate.letterHypotheses) ? candidate.letterHypotheses : [],
+    heritageGenerations: Array.isArray(candidate.heritageGenerations) ? candidate.heritageGenerations : [],
+    heritageModelTraining: candidate.heritageModelTraining && typeof candidate.heritageModelTraining === 'object'
+      ? candidate.heritageModelTraining
+      : null,
   };
 }
 
@@ -95,6 +136,9 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
   const [experiments, setExperiments] = useState<ComparisonExperiment[]>([]);
   const [trainingExamples, setTrainingExamples] = useState<MorphologyTrainingExample[]>([]);
   const [modelTrainedAt, setModelTrainedAt] = useState<string | null>(null);
+  const [letterHypotheses, setLetterHypotheses] = useState<LetterMeaningHypothesis[]>([]);
+  const [heritageGenerations, setHeritageGenerations] = useState<SavedHeritageGeneration[]>([]);
+  const [heritageModelTraining, setHeritageModelTraining] = useState<HeritageModelTraining | null>(null);
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState(false);
 
@@ -109,6 +153,9 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
           setExperiments(stored.experiments);
           setTrainingExamples(stored.trainingExamples);
           setModelTrainedAt(stored.modelTrainedAt);
+          setLetterHypotheses(stored.letterHypotheses);
+          setHeritageGenerations(stored.heritageGenerations);
+          setHeritageModelTraining(stored.heritageModelTraining);
         } else {
           setStorageError(true);
         }
@@ -124,10 +171,18 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
 
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ sources, experiments, trainingExamples, modelTrainedAt }))
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sources,
+      experiments,
+      trainingExamples,
+      modelTrainedAt,
+      letterHypotheses,
+      heritageGenerations,
+      heritageModelTraining,
+    }))
       .then(() => setStorageError(false))
       .catch(() => setStorageError(true));
-  }, [experiments, modelTrainedAt, ready, sources, trainingExamples]);
+  }, [experiments, heritageGenerations, heritageModelTraining, letterHypotheses, modelTrainedAt, ready, sources, trainingExamples]);
 
   const addSource = useCallback((source: NewHeritageSource) => {
     setSources((current) => [{ ...source, id: createId(), createdAt: new Date().toISOString() }, ...current]);
@@ -147,8 +202,19 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
     setModelTrainedAt(null);
   }, []);
 
+  const addLetterHypothesis = useCallback((hypothesis: NewLetterHypothesis) => {
+    setLetterHypotheses((current) => [{ ...hypothesis, id: createId(), createdAt: new Date().toISOString() }, ...current]);
+    setHeritageModelTraining(null);
+  }, []);
+
+  const addHeritageGeneration = useCallback((generation: NewHeritageGeneration) => {
+    setHeritageGenerations((current) => [{ ...generation, id: createId(), createdAt: new Date().toISOString() }, ...current]);
+  }, []);
+
   const deleteSource = useCallback((id: string) => {
     setSources((current) => current.filter((source) => source.id !== id));
+    setLetterHypotheses((current) => current.filter((hypothesis) => hypothesis.sourceId !== id));
+    setHeritageModelTraining((current) => current?.sourceId === id ? null : current);
   }, []);
 
   const deleteExperiment = useCallback((id: string) => {
@@ -165,8 +231,26 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
     setModelTrainedAt(null);
   }, []);
 
+  const deleteLetterHypothesis = useCallback((id: string) => {
+    setLetterHypotheses((current) => current.filter((hypothesis) => hypothesis.id !== id));
+    setHeritageModelTraining(null);
+  }, []);
+
+  const setLetterHypothesisModelReady = useCallback((id: string, modelReady: boolean) => {
+    setLetterHypotheses((current) => current.map((hypothesis) => hypothesis.id === id ? { ...hypothesis, modelReady } : hypothesis));
+    setHeritageModelTraining(null);
+  }, []);
+
+  const deleteHeritageGeneration = useCallback((id: string) => {
+    setHeritageGenerations((current) => current.filter((generation) => generation.id !== id));
+  }, []);
+
   const markModelTrained = useCallback((trainedAt: string) => {
     setModelTrainedAt(trainedAt);
+  }, []);
+
+  const markHeritageModelTrained = useCallback((training: HeritageModelTraining) => {
+    setHeritageModelTraining(training);
   }, []);
 
   const value = useMemo(
@@ -177,6 +261,9 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
       experiments,
       trainingExamples,
       modelTrainedAt,
+      letterHypotheses,
+      heritageGenerations,
+      heritageModelTraining,
       addSource,
       addExperiment,
       addTrainingExamples,
@@ -184,7 +271,13 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
       deleteExperiment,
       deleteTrainingExample,
       updateTrainingExampleSplit,
+      addLetterHypothesis,
+      deleteLetterHypothesis,
+      setLetterHypothesisModelReady,
+      addHeritageGeneration,
+      deleteHeritageGeneration,
       markModelTrained,
+      markHeritageModelTrained,
     }),
     [
       ready,
@@ -193,6 +286,9 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
       experiments,
       trainingExamples,
       modelTrainedAt,
+      letterHypotheses,
+      heritageGenerations,
+      heritageModelTraining,
       addSource,
       addExperiment,
       addTrainingExamples,
@@ -200,7 +296,13 @@ export function ResearchNotebookProvider({ children }: { children: React.ReactNo
       deleteExperiment,
       deleteTrainingExample,
       updateTrainingExampleSplit,
+      addLetterHypothesis,
+      deleteLetterHypothesis,
+      setLetterHypothesisModelReady,
+      addHeritageGeneration,
+      deleteHeritageGeneration,
       markModelTrained,
+      markHeritageModelTrained,
     ],
   );
 

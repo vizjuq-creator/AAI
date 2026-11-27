@@ -2,9 +2,9 @@
 
 ## Short verdict
 
-The proposal combines several real research areas—Arabic root-and-pattern morphology, articulatory feature representations, hyperdimensional computing (HDC), and hyperbolic embeddings—but it moves too quickly from *plausible representation choices* to *unsubstantiated performance and energy claims*. The central research question is testable; the asserted 80% parameter reduction, 0.001 W operation, “zero tokenizer,” semantic content of each letter, and language-wide superiority are not established by the equations in the proposal.
+The proposal combines several real research areas—Arabic root-and-pattern morphology, articulatory feature representations, hyperdimensional computing (HDC), and hyperbolic embeddings—but it moves too quickly from *plausible representation choices* to *unsubstantiated performance and energy claims*. The repository now includes a small trained HDC classifier and a source-conditioned symbolic motif generator, but it still has no general Arabic generative language model or sourced letter-meaning corpus. The asserted 80% parameter reduction, 0.001 W operation, “zero tokenizer,” semantic content of each letter, and language-wide superiority are not established by the equations or prototype.
 
-This is an engineering sanity check, not a full literature review. The original proposal does not provide citations, a dataset, a training procedure, or benchmark results for those numerical claims.
+This is an engineering sanity check, not a full literature review. The original proposal does not provide citations, a dataset, a complete neural training procedure, or benchmark results for those numerical claims.
 
 ## Claim-by-claim review
 
@@ -45,19 +45,19 @@ Useful Arabic NLP baselines include openly documented analyzers/toolkits such as
 - Define whether symbols are Unicode code points, graphemes, phonemes, or morphemes, and how diacritics and clitics are represented.
 - Publish the phonetic feature inventory, source/annotation process, dialect assumptions, and context-sensitive cases (e.g. hamza seats, alif, tāʾ marbūṭa, wāw/yāʾ).
 - Give tensor dimensions and the exact meaning of `⊗`, `⊙`, binding, bundling, permutation, and the state update. A raw outer product changes dimension from `d_r` and `d_p` to `d_r d_p`; any compression/projection must be explicit.
-- Specify how a bound vector is decoded back into a root, pattern, word, or next token. State the loss, training procedure, optimizer (if any), and stopping criteria.
+- Specify how a bound vector is decoded back into a root, pattern, word, or next token. State the loss, training procedure, optimizer (if any), and stopping criteria. The current symbolic generator uses `P(motif | letter, source, scope, position) = count / per-letter-position total` from explicitly approved researcher annotations, then ranks ordered compositions by the product of per-position frequencies. This is a transparent independence baseline, not a learned semantic truth probability.
 - Constrain Poincaré points to the unit ball and specify the embedding objective and optimization procedure; a distance formula by itself does not train an embedding.
 - Define the power measurement as energy for a fixed workload (joules), not a bare watt figure.
 
 ## What this prototype implements
 
-The Android-first app in `mobile/` is deliberately a **measurement workbench stub**, not an implementation of the claimed paradigm:
+The Android-first app in `mobile/` is deliberately a **research workbench prototype**, not an implementation of the full claimed paradigm:
 
-- a hand-authored, broad eight-feature table for visible inspection;
-- a tiny example lexicon that surfaces ambiguity (for example, unvowelled `كتب`); it is not a general analyzer;
-- deterministic 1,024-bit vectors using seeded pseudo-random feature-role vectors, majority bundling, and XOR binding;
-- Hamming comparison of the selected root, pattern, and bound components;
-- a Poincaré formula applied to synthetic, untrained points;
-- local-only processing and a JSON comparison report.
+- a hand-authored, broad eight-feature table for visible inspection and a tiny example lexicon that surfaces ambiguity;
+- deterministic 1,024-bit HDC vectors, plus a nearest-prototype classifier trained from user-labeled roots/patterns and written tashkeel features;
+- a source-grounded, symbolic generator that compiles only explicitly approved letter hypotheses from one cited source, scope, and (where specified) letter position at a time;
+- a count-based per-letter motif distribution and bounded Cartesian/beam composition that abstains when a letter lacks an eligible hypothesis;
+- local persistence and JSON export for citations, operational annotations, training metadata, and saved generation outputs;
+- a Poincaré formula applied to synthetic, untrained points.
 
-This makes the assumptions inspectable and gives the next research stage something concrete to replace with validated annotations, training, baselines, and on-device measurements.
+The generator does not parse quotations, learn researcher prose, synthesize unconstrained Arabic text, or ship any historical letter-meaning claims. It makes the first trainable/generative step inspectable; building a neural generator will require an adjudicated source-grounded corpus and a separate training/evaluation design.

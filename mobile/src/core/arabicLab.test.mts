@@ -7,6 +7,7 @@ import {
   comparePoincareForms,
   encodeFeatureSequence,
   evaluateHdcClassifier,
+  extractArabicLetterSequence,
   getFeatureBits,
   lookupMorphology,
   normalizeArabic,
@@ -15,6 +16,11 @@ import {
   similarityPercent,
   trainHdcClassifier,
 } from './arabicLab.ts';
+import {
+  generateHeritageInterpretations,
+  heritageModelSignature,
+  trainHeritageMeaningModel,
+} from './heritageGenerator.ts';
 
 test('normalization removes tashkeel and folds selected alef variants', () => {
   assert.equal(normalizeArabic('مَكْتَبَةٌ'), 'مكتبة');
@@ -98,6 +104,55 @@ test('HDC prototype classifier trains from labels and predicts on the same devic
   assert.equal(prediction?.similarity, 100);
   assert.equal(evaluation.total, 3);
   assert.equal(evaluation.accuracyPercent, 100);
+});
+
+test('heritage generator trains only approved hypotheses from one source and scope', () => {
+  const hypotheses = [
+    { id: 'a-k-1', sourceId: 'book-a', letter: 'ك', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['motif-a', 'motif-b'], modelReady: true, createdAt: '' },
+    { id: 'a-k-2', sourceId: 'book-a', letter: 'ك', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['motif-a'], modelReady: true, createdAt: '' },
+    { id: 'a-t-1', sourceId: 'book-a', letter: 'ت', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['motif-c'], modelReady: true, createdAt: '' },
+    { id: 'a-b-1', sourceId: 'book-a', letter: 'ب', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['motif-d'], modelReady: true, createdAt: '' },
+    { id: 'b-k-1', sourceId: 'book-b', letter: 'ك', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['foreign-source'], modelReady: true, createdAt: '' },
+    { id: 'a-th-1', sourceId: 'book-a', letter: 'ث', scope: 'root-context' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['draft-only'], modelReady: false, createdAt: '' },
+    { id: 'a-k-alone', sourceId: 'book-a', letter: 'ك', scope: 'independent-letter' as const, position: 'any' as const, researcherInterpretation: 'fixture', semanticMotifs: ['other-scope'], modelReady: true, createdAt: '' },
+  ];
+
+  const model = trainHeritageMeaningModel(hypotheses, 'book-a', 'root-context');
+  assert.ok(model);
+  assert.equal(model.hypothesisCount, 4);
+  assert.equal(model.motifCount, 5);
+  assert.deepEqual(model.hypothesisIds, ['a-b-1', 'a-k-1', 'a-k-2', 'a-t-1']);
+  assert.equal(model.byLetter.some((entry) => entry.letter === 'ث'), false);
+  assert.equal(model.byLetter.find((entry) => entry.letter === 'ك')?.positions.find((position) => position.position === 'any')?.options.find((option) => option.motif === 'motif-a')?.probability, 2 / 3);
+
+  const generated = generateHeritageInterpretations(model, 'كتب');
+  assert.deepEqual(generated.letters, ['ك', 'ت', 'ب']);
+  assert.equal(generated.candidates.length, 2);
+  assert.equal(generated.candidates[0]?.components[0]?.motif, 'motif-a');
+  assert.ok((generated.candidates[0]?.modelScore ?? 0) > (generated.candidates[1]?.modelScore ?? 0));
+  assert.equal(generated.candidates[0]?.components.length, 3);
+
+  const incomplete = generateHeritageInterpretations(model, 'كتج');
+  assert.deepEqual(incomplete.missing, [{ letter: 'ج', position: 'final' }]);
+  assert.equal(incomplete.candidates.length, 0);
+  assert.equal(trainHeritageMeaningModel(hypotheses, 'missing-book', 'root-context'), null);
+  assert.deepEqual(extractArabicLetterSequence('أَبَ'), ['أ', 'ب']);
+  assert.ok(heritageModelSignature(hypotheses, 'book-a', 'root-context').includes('a-k-1'));
+});
+
+test('heritage generator respects positional hypotheses and uses general rules only as fallback', () => {
+  const model = trainHeritageMeaningModel([
+    { id: 'k-any', sourceId: 'book', letter: 'ك', scope: 'root-context', position: 'any', researcherInterpretation: 'fixture', semanticMotifs: ['general'], modelReady: true, createdAt: '' },
+    { id: 'k-initial', sourceId: 'book', letter: 'ك', scope: 'root-context', position: 'initial', researcherInterpretation: 'fixture', semanticMotifs: ['initial-specific'], modelReady: true, createdAt: '' },
+    { id: 'b-any', sourceId: 'book', letter: 'ب', scope: 'root-context', position: 'any', researcherInterpretation: 'fixture', semanticMotifs: ['ba-general'], modelReady: true, createdAt: '' },
+  ], 'book', 'root-context');
+  assert.ok(model);
+
+  const initial = generateHeritageInterpretations(model, 'كب');
+  assert.equal(initial.candidates[0]?.components[0]?.motif, 'initial-specific');
+  assert.equal(initial.candidates[0]?.components[0]?.positionType, 'initial');
+  assert.equal(initial.candidates[0]?.components[1]?.motif, 'ba-general');
+  assert.equal(initial.candidates[0]?.components[1]?.positionType, 'any');
 });
 
 test('Poincare distance is finite, symmetric, and zero for an identical point', () => {

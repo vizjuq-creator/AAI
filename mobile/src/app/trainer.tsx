@@ -309,7 +309,7 @@ export default function TrainerScreen() {
               <EvaluationCard title="دقة الجذر" total={rootEvaluation?.total ?? 0} accuracy={rootEvaluation?.accuracyPercent ?? null} />
               <EvaluationCard title="دقة الوزن" total={patternEvaluation?.total ?? 0} accuracy={patternEvaluation?.accuracyPercent ?? null} />
             </View>
-            {!testExamples.length ? <Text style={styles.evaluationHint}>عيّن بعض الأمثلة إلى «اختبار مستقل» لتقدير التعميم. لن نعرض دقة التدريب على أنها دقة اختبار.</Text> : null}
+            {!testExamples.length ? <Text style={styles.evaluationHint}>عيّن بعض الأمثلة إلى «اختبار محجوز». هذا فصل على مستوى المثال فقط؛ لا يغني عن اختبار بالجذور المحجوبة.</Text> : null}
           </View>
         ) : null}
       </Card>

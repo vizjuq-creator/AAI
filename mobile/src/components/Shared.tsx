@@ -13,12 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii } from '../theme';
 
-export type ScreenName = 'analyze' | 'compare' | 'trainer' | 'notebook' | 'method';
+export type ScreenName = 'analyze' | 'compare' | 'trainer' | 'generator' | 'notebook' | 'method';
 
 const NAV_ITEMS: Array<{ key: ScreenName; href: string; label: string; glyph: string }> = [
   { key: 'analyze', href: '/', label: 'الرصد', glyph: '◉' },
   { key: 'compare', href: '/compare', label: 'المقارنة', glyph: '⇄' },
   { key: 'trainer', href: '/trainer', label: 'التدريب', glyph: '△' },
+  { key: 'generator', href: '/generator', label: 'التوليد', glyph: '✦' },
   { key: 'notebook', href: '/notebook', label: 'الدفتر', glyph: '▤' },
   { key: 'method', href: '/method', label: 'المنهج', glyph: '⌘' },
 ];
@@ -89,13 +90,14 @@ export function Badge({
   tone = 'neutral',
 }: {
   children: React.ReactNode;
-  tone?: 'neutral' | 'green' | 'gold' | 'coral' | 'dark';
+  tone?: 'neutral' | 'green' | 'gold' | 'coral' | 'violet' | 'dark';
 }) {
   const toneStyle = {
     neutral: styles.badgeNeutral,
     green: styles.badgeGreen,
     gold: styles.badgeGold,
     coral: styles.badgeCoral,
+    violet: styles.badgeViolet,
     dark: styles.badgeDark,
   }[tone];
   const textStyle = tone === 'dark' ? styles.badgeTextLight : styles.badgeText;
@@ -271,12 +273,12 @@ const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 16 },
   footerNote: { width: '100%', maxWidth: 1000, alignSelf: 'center', color: '#87928B', fontSize: 10, textAlign: 'center', paddingTop: 18, paddingBottom: 3 },
   bottomBar: { backgroundColor: colors.surface, borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 9, paddingBottom: 5 },
-  bottomBarInner: { flexDirection: 'row', width: '100%', maxWidth: 520, alignSelf: 'center', justifyContent: 'space-around', gap: 2 },
-  navItem: { minWidth: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 7, borderRadius: 13, gap: 1 },
+  bottomBarInner: { flexDirection: 'row', width: '100%', maxWidth: 560, alignSelf: 'center', justifyContent: 'space-around', gap: 1 },
+  navItem: { minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 7, borderRadius: 12, gap: 1 },
   navItemSelected: { backgroundColor: colors.mintSoft },
-  navGlyph: { color: '#78857E', fontSize: 17, lineHeight: 20, fontWeight: '700' },
+  navGlyph: { color: '#78857E', fontSize: 16, lineHeight: 19, fontWeight: '700' },
   navGlyphSelected: { color: colors.forest },
-  navLabel: { color: '#78857E', fontSize: 9, fontWeight: '600' },
+  navLabel: { color: '#78857E', fontSize: 8, fontWeight: '600' },
   navLabelSelected: { color: colors.forest, fontWeight: '800' },
   eyebrow: { color: colors.teal, fontSize: 10, fontWeight: '800', letterSpacing: 1.3, textAlign: 'right', textTransform: 'uppercase' },
   eyebrowLight: { color: '#C4DAA2' },
@@ -285,6 +287,7 @@ const styles = StyleSheet.create({
   badgeGreen: { backgroundColor: colors.mintSoft },
   badgeGold: { backgroundColor: colors.goldSoft },
   badgeCoral: { backgroundColor: colors.coralSoft },
+  badgeViolet: { backgroundColor: colors.violetSoft },
   badgeDark: { backgroundColor: '#31564A' },
   badgeText: { color: colors.ink, fontSize: 10, fontWeight: '700' },
   badgeTextLight: { color: '#E6F2E6', fontSize: 10, fontWeight: '700' },

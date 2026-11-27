@@ -114,8 +114,12 @@ export function getFeatureBits(letter: string): FeatureBits {
   return FEATURE_GROUPS.map((group) => group.includes(canonical));
 }
 
-function letterCharacters(text: string): string[] {
+export function extractArabicLetterSequence(text: string): string[] {
   return Array.from(stripDiacritics(text)).filter((character) => ARABIC_LETTER_CHARACTER.test(character));
+}
+
+function letterCharacters(text: string): string[] {
+  return extractArabicLetterSequence(text);
 }
 
 function letterSegments(text: string): Array<{ letter: string; marks: string[] }> {
