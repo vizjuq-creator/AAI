@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LabProvider } from '../context/LabContext';
+import { ResearchNotebookProvider } from '../context/ResearchNotebookContext';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -16,8 +17,10 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <LabProvider>
-        <StatusBar style="light" />
-        <Slot />
+        <ResearchNotebookProvider>
+          <StatusBar style="light" />
+          <Slot />
+        </ResearchNotebookProvider>
       </LabProvider>
     </SafeAreaProvider>
   );

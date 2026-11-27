@@ -30,6 +30,7 @@ import {
   normalizeArabic,
 } from '../core/arabicLab';
 import type { MorphSample } from '../core/arabicLab';
+import { useResearchNotebook } from '../context/ResearchNotebookContext';
 import { colors, radii } from '../theme';
 
 function findSample(id: string): MorphSample {
@@ -149,6 +150,7 @@ function SimilarityRow({
 }
 
 export default function CompareScreen() {
+  const { addExperiment, sources, ready: notebookReady } = useResearchNotebook();
   const [leftId, setLeftId] = useState('kitaab');
   const [rightId, setRightId] = useState('maktaba');
   const [leftCustomActive, setLeftCustomActive] = useState(false);
@@ -161,6 +163,14 @@ export default function CompareScreen() {
   });
   const left = leftCustomActive ? leftManual : findSample(leftId);
   const right = rightCustomActive ? rightManual : findSample(rightId);
+  const [experimentQuestion, setExperimentQuestion] = useState('هل يحفظ الربط تشابه الجذر؟');
+  const [experimentNotes, setExperimentNotes] = useState('');
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const selectedSource = sources.find((source) => source.id === selectedSourceId);
+  const sourceLabel = selectedSource
+    ? [selectedSource.book, selectedSource.author, selectedSource.location].filter(Boolean).join(' · ')
+    : undefined;
 
   const updateManual = (
     setter: React.Dispatch<React.SetStateAction<MorphSample>>,
@@ -191,11 +201,35 @@ export default function CompareScreen() {
     [left.root, left.patternCode, right.root, right.patternCode],
   );
 
+  const saveExperiment = () => {
+    if (!notebookReady || !experimentQuestion.trim()) return;
+    addExperiment({
+      question: experimentQuestion.trim(),
+      leftForm: left.form,
+      leftRoot: left.root,
+      leftPattern: left.pattern,
+      rightForm: right.form,
+      rightRoot: right.root,
+      rightPattern: right.pattern,
+      rootSimilarity: hdc.rootSimilarity,
+      patternSimilarity: hdc.patternSimilarity,
+      boundSimilarity: hdc.boundSimilarity,
+      poincareDistance: poincare,
+      notes: experimentNotes.trim(),
+      heritageSourceId: selectedSource?.id,
+      heritageSourceLabel: sourceLabel,
+    });
+    setSaved(true);
+  };
+
   const exportReport = async () => {
     const report = {
       app: 'Miyaar Arabic Lab',
       version: '0.1.0',
       generatedAt: new Date().toISOString(),
+      question: experimentQuestion,
+      notes: experimentNotes,
+      heritageSource: sourceLabel ?? null,
       method: 'seeded 1-bit HDC demonstration; not a trained semantic model',
       left: { form: left.form, root: left.root, pattern: left.pattern, patternCode: left.patternCode },
       right: { form: right.form, root: right.root, pattern: right.pattern, patternCode: right.patternCode },
@@ -335,6 +369,61 @@ export default function CompareScreen() {
         </View>
       </Card>
 
+      <Card style={styles.saveCard}>
+        <SectionHeading eyebrow="سجّل ما اختبرته" title="أضف المقارنة إلى الدفتر" trailing={saved ? <Badge tone="green">تم الحفظ</Badge> : null} />
+        <TextInput
+          accessibilityLabel="سؤال التجربة"
+          value={experimentQuestion}
+          onChangeText={(value) => { setExperimentQuestion(value); setSaved(false); }}
+          placeholder="سؤال أو فرضية قابلة للاختبار"
+          placeholderTextColor="#89938C"
+          style={styles.saveInput}
+          textAlign="right"
+          maxLength={180}
+        />
+        <TextInput
+          accessibilityLabel="ملاحظات التجربة"
+          value={experimentNotes}
+          onChangeText={(value) => { setExperimentNotes(value); setSaved(false); }}
+          placeholder="ملاحظات الباحث أو تفسير النتيجة (اختياري)"
+          placeholderTextColor="#89938C"
+          style={[styles.saveInput, styles.saveInputMultiline]}
+          multiline
+          textAlign="right"
+          textAlignVertical="top"
+          maxLength={1000}
+        />
+        <View style={styles.sourceLinkSection}>
+          <Text style={styles.sourceLinkLabel}>اربطها بمصدر تراثي موثّق (اختياري)</Text>
+          <HorizontalScroll>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedSourceId === null }}
+              onPress={() => { setSelectedSourceId(null); setSaved(false); }}
+              style={[styles.sourceLinkChip, selectedSourceId === null && styles.sourceLinkChipSelected]}
+            >
+              <Text style={[styles.sourceLinkText, selectedSourceId === null && styles.sourceLinkTextSelected]}>دون مصدر</Text>
+            </Pressable>
+            {sources.map((source) => {
+              const isSelected = source.id === selectedSourceId;
+              return (
+                <Pressable
+                  key={source.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => { setSelectedSourceId(source.id); setSaved(false); }}
+                  style={[styles.sourceLinkChip, isSelected && styles.sourceLinkChipSelected]}
+                >
+                  <Text numberOfLines={1} style={[styles.sourceLinkText, isSelected && styles.sourceLinkTextSelected]}>{source.book} · {source.author}</Text>
+                </Pressable>
+              );
+            })}
+          </HorizontalScroll>
+        </View>
+        <PrimaryButton label={!notebookReady ? 'جارٍ تحميل الدفتر…' : saved ? 'حُفظت في دفتر البحث' : 'احفظ المقارنة والنتيجة'} onPress={saveExperiment} disabled={!notebookReady || !experimentQuestion.trim()} trailing={saved ? '✓' : '＋'} />
+        <Text style={styles.saveHint}>الحفظ محلي على الجهاز، ويضم الصيغ والجذور والأوزان والنتائج والسؤال والمصدر المرتبط.</Text>
+      </Card>
+
       <PrimaryButton label="تصدير تقرير التجربة JSON" onPress={exportReport} trailing="⇧" />
       <View style={styles.quickCompareActions}>
         <SmallAction label="جذر مشترك" onPress={() => { setLeftCustomActive(false); setRightCustomActive(false); setLeftId('kitaab'); setRightId('maktaba'); }} />
@@ -413,5 +502,15 @@ const styles = StyleSheet.create({
   caveatCopy: { flex: 1, gap: 4 },
   caveatTitle: { color: '#5F4827', fontSize: 12, fontWeight: '800', textAlign: 'right' },
   caveatText: { color: '#6C5837', fontSize: 10, lineHeight: 17, textAlign: 'right', writingDirection: 'rtl' },
+  saveCard: { gap: 11 },
+  saveInput: { minHeight: 42, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FAFBF7', paddingHorizontal: 11, paddingVertical: 9, color: colors.ink, fontSize: 12, writingDirection: 'rtl' },
+  saveInputMultiline: { minHeight: 75, lineHeight: 19, textAlignVertical: 'top' },
+  sourceLinkSection: { gap: 7 },
+  sourceLinkLabel: { color: colors.muted, fontSize: 10, fontWeight: '700', textAlign: 'right' },
+  sourceLinkChip: { maxWidth: 210, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, paddingHorizontal: 10, paddingVertical: 7 },
+  sourceLinkChipSelected: { borderColor: colors.forest, backgroundColor: colors.forest },
+  sourceLinkText: { color: colors.ink, fontSize: 9, fontWeight: '700' },
+  sourceLinkTextSelected: { color: colors.mint },
+  saveHint: { color: colors.muted, fontSize: 9, lineHeight: 15, textAlign: 'right', writingDirection: 'rtl' },
   quickCompareActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, justifyContent: 'flex-start' },
 });
