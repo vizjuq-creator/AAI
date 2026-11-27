@@ -1,0 +1,2 @@
+# AAI
+Arabic Artificial intelligence 
