@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "مِعيار",
+    "slug": "miyaar-arabic-lab",
+    "description": "مختبر محلي لتجارب صرف العربية والتمثيل الصواتي.",
+    "scheme": "miyaar",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "android": {
+      "package": "org.aai.miyaar",
+      "adaptiveIcon": {
+        "backgroundColor": "#12332D",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.aai.miyaar"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
